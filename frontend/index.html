@@ -1,36 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
 </head>
+
 <body>
+    <h1>Welcome to the JWT Token Refresh Example</h1>
+    <p>This page will automatically refresh your JWT session token.</p>
+
+    <div id="register">
+        <form id="register-form">
+            <h2>Sign Up</h2>
+            <input type="text" id="reg-username" placeholder="Username" required><br>
+            <input type="email" id="reg-email" placeholder="Email" required><br>
+            <input type="password" id="reg-password" placeholder="Password" required><br>
+            <button type="submit">Register</button>
+            <p id="reg-message"></p>
+        </form>
+    </div>
+    <div class="login">
+        <form id="login-form">
+            <h2>Log In</h2>
+            <input type="text" id="login-username" placeholder="Username" required><br>
+            <input type="password" id="login-password" placeholder="Password" required><br>
+            <button type="submit">Log In</button>
+            <p id="login-message"></p>
+        </form>
+    </div>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             checksession();
             async function checksession() {
-                const response = await fetch('http://127.0.0.1:8000/api/token/refresh/', {
-                    method: 'POST'
-                }).catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while refreshing the session. Please try again.');
-                });
-                if (response.ok){
-                    //This handles the case where session is valid
-                    console.log('Session is valid');
-                    const data = await response.json();
-                    console.log(data);
-                    sessionStorage.setItem('token', data.access);
-                    alert('Session refreshed successfully!');
-                }
-                else {
-                    //This handles the case where session is invalid
-                    console.error('Failed to refresh session');
-                    alert('Session refresh failed. Please log in again.');
-                }
+                fetch('http://127.0.0.1:8000/api/token/refresh/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        if (response.ok) {
+                            return response.json();
+                        }
+                        throw new Error('Session refresh failed');
+                    })
+                    .then(data => {
+                        console.log('Session is valid');
+                        console.log(data);
+                        sessionStorage.setItem('token', data.access);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
             }
         });
     </script>
 </body>
+
 </html>
