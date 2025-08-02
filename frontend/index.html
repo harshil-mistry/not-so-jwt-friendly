@@ -8,10 +8,10 @@
 </head>
 
 <body>
-    <h1>Welcome to the JWT Token Refresh Example</h1>
-    <p>This page will automatically refresh your JWT session token.</p>
+    <h1>Bhai basic JWT j che</h1>
+    <p>Nothing Ground-breaking (yet)</p>
 
-    <div id="register">
+    <div id="register" style="display: none;">
         <form id="register-form">
             <h2>Sign Up</h2>
             <input type="text" id="reg-username" placeholder="Username" required><br>
@@ -21,7 +21,7 @@
             <p id="reg-message"></p>
         </form>
     </div>
-    <div class="login">
+    <div id="login" style="display: none;">
         <form id="login-form">
             <h2>Log In</h2>
             <input type="text" id="login-username" placeholder="Username" required><br>
@@ -30,38 +30,69 @@
             <p id="login-message"></p>
         </form>
     </div>
+    <div class="todos" style="display: none;" id="todo-container">
+        <div id="app-container">
+            <h2>My To-Do List</h2>
+
+            <input type="text" id="todo-title" placeholder="New to-do title" required>
+            <button id="add-todo">Add To-Do</button>
+
+            <ul id="todo-list"></ul>
+            <button id="logout-btn">Log Out</button>
+        </div>
+    </div>
 
     <script>
         const API_URL = 'http://127.0.0.1:8000/api';
 
-
         document.addEventListener('DOMContentLoaded', function () {
-            // checksession();
+            checksession();
             async function checksession() {
-                fetch('http://127.0.0.1:8000/api/token/refresh/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
+                var logged_in = false
+                var refresh = localStorage.getItem('refresh')
+                if (!refresh) {
+                    console.log("No refresh key found")
+                }
+                else {
+                    console.log("Refresh key found, trying to log the user in")
+                    const response = await fetch(`${API_URL}/token/refresh/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refresh })
+                    })
+                    if (!response.ok) {
+                        console.log("User is logged out")
                     }
-                })
-                    .then(response => {
-                        console.log('Response status:', response.status);
-                        if (response.ok) {
-                            return response.json();
-                        }
-                        throw new Error('Session refresh failed');
-                    })
-                    .then(data => {
-                        console.log('Session is valid');
-                        console.log(data);
-                        sessionStorage.setItem('token', data.access);
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
+                    else {
+                        data = await response.json()
+                        var access = data.access
+                        localStorage.setItem('access', access)
+                        console.log("User is logged in")
+                        logged_in = true
+                    }
+                }
+                if (logged_in) {
+                    LoggedInHomeScreen();
+                } else {
+                    LoggedOutHomeScreen();
+                }
             }
         });
 
+        function LoggedOutHomeScreen() {
+            document.getElementById('register').style.display = "block"
+            document.getElementById('login').style.display = "block"
+            document.getElementById('todo-container').style.display = "none"
+        }
+
+        async function LoggedInHomeScreen() {
+            document.getElementById('register').style.display = "none"
+            document.getElementById('login').style.display = "none"
+            document.getElementById('todo-container').style.display = "block"
+            await FetchTodos();
+        }
+
+        //To handle signup
         document.getElementById('register-form').addEventListener('submit', async function (e) {
             e.preventDefault();
             const username = document.getElementById('reg-username').value;
@@ -80,7 +111,7 @@
                             msg.textContent = "Registration successful! Please Login"
                             msg.style.color = "green"
                         }
-                        else{
+                        else {
                             msg.textContent = "Registration failed"
                             msg.style.color = "red"
                         }
@@ -93,25 +124,30 @@
             }
         })
 
-        document.getElementById('login-form').addEventListener('submit', async function (e){
+        //To handle signin
+        document.getElementById('login-form').addEventListener('submit', async function (e) {
             e.preventDefault();
             username = document.getElementById('login-username').value
             password = document.getElementById('login-password').value
             msg = document.getElementById('login-message')
 
             const response = await fetch(`${API_URL}/token/`, {
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({username, password})
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
             })
-            
-            if(response.ok){
+
+            if (response.ok) {
                 const data = await response.json()
                 console.log(`Access key received : ${data.access}`)
+                localStorage.setItem('access', data.access)
+                console.log(`Refresh key received : ${data.refresh}`)
+                localStorage.setItem('refresh', data.refresh)
                 msg.textContent = "Logged in successfully! Check the console"
                 msg.style.color = "green"
+                LoggedInHomeScreen()
             }
-            else{
+            else {
                 const data = await response.json()
                 console.log(`Some error occurred : ${JSON.stringify(data)}`)
                 msg.textContent = "Failed login attempt"
@@ -119,6 +155,60 @@
             }
         })
 
+        //Funtion to send authenticated requests
+        async function authFetch(url, options = {}) {
+            access = localStorage.getItem('access')
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${access}`,
+                ...options.headers,
+            };
+            const response = await fetch(url, { ...options, headers });
+            return response;
+        }
+
+        //Adding Todo
+        document.getElementById('add-todo').addEventListener('click', async function () {
+            title = document.getElementById('todo-title').value
+            if (!title) {
+                return
+            }
+            console.log("Added")
+            document.getElementById('todo-title').value = ""
+
+            const response = await authFetch(`${API_URL}/todos/`, {
+                method: 'POST',
+                body: JSON.stringify({ title, completed: false })
+            })
+
+            console.log("Todo added")
+            await FetchTodos();
+
+        })
+
+        //Fetching Todos
+        async function FetchTodos() {
+            const response = await authFetch(`${API_URL}/todos/`, {})
+            console.log("Function called")
+            if (response.ok){
+                data = await response.json()
+                document.getElementById("todo-list").innerHTML = ""
+                data.forEach(element => {
+                    console.log(`${element}`)
+                    document.getElementById("todo-list").innerHTML += `
+                        <li>${element.title}</li>
+                    `
+                });
+            }
+        }
+
+        //Logout
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            localStorage.clear()
+            document.getElementById('todo-title').value = ""
+            document.getElementById("todo-list").innerHTML = ""
+            LoggedOutHomeScreen()
+        })
     </script>
 </body>
 
